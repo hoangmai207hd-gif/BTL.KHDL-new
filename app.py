@@ -4,6 +4,9 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from models import (
     load_data,
@@ -20,10 +23,50 @@ from models import (
 # =========================
 
 st.set_page_config(
-    page_title='AI Phát Hiện Gian Lận Tài Chính',
-    page_icon='📊',
-    layout='wide'
+    page_title='AI Financial Risk Detection',
+    page_icon='💰',
+    layout='wide',
+    initial_sidebar_state='expanded'
 )
+
+st.markdown("""
+<div style='text-align:center'>
+<h1>💰 AI Financial Risk Detection System</h1>
+<h4>Financial Statement Anomaly & Risk Classification Platform</h4>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+
+[data-testid="stAppViewContainer"]{
+    background-color:#0e1117;
+}
+
+[data-testid="stHeader"]{
+    background:rgba(0,0,0,0);
+}
+
+h1,h2,h3,h4{
+    color:white;
+}
+
+.metric-box{
+    background:#1f2937;
+    padding:20px;
+    border-radius:15px;
+    text-align:center;
+    box-shadow:0px 5px 15px rgba(0,0,0,0.3);
+}
+
+.big-number{
+    font-size:32px;
+    font-weight:bold;
+    color:#00ff99;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -189,75 +232,127 @@ elif menu == 'Huấn luyện':
         )
 
         score_df = pd.DataFrame(results_list)
+        best_model_summary = next((r for r in results_list if r['Model'] == best_model_name), None)
 
-        st.subheader('📋 Bảng đánh giá mô hình')
-        st.dataframe(score_df, use_container_width=True)
+        if best_model_summary is not None:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric('🏆 Best Model', best_model_name)
+            with col2:
+                st.metric('🎯 Accuracy', f"{best_model_summary['Accuracy']:.2%}")
+            with col3:
+                st.metric('📈 Recall', f"{best_model_summary['Recall']:.2%}")
+            with col4:
+                st.metric('🔥 F1 Score', f"{best_model_summary['F1-Score']:.2%}")
 
-        fig_score = px.bar(
-            score_df,
-            x='Model',
-            y='Accuracy',
-            color='Model',
-            text='Accuracy',
-            title='So sánh độ chính xác mô hình AI'
-        )
-        st.plotly_chart(fig_score, use_container_width=True)
+        tab1, tab2, tab3 = st.tabs([
+            '📊 Dataset',
+            '🤖 Models',
+            '⭐ Features'
+        ])
 
-        metric_df = score_df.melt(
-            id_vars='Model',
-            var_name='Metric',
-            value_name='Score'
-        )
+        with tab1:
+            st.subheader('📁 Dataset overview')
+            st.dataframe(df.head(20), use_container_width=True)
 
-        fig = px.bar(
-            metric_df,
-            x='Model',
-            y='Score',
-            color='Metric',
-            barmode='group',
-            title='So sánh các chỉ số đánh giá'
-        )
+            st.subheader('📊 Phân bố dữ liệu')
+            fraud_counts = df['Financial_Status'].value_counts()
+            fig_dataset = px.bar(
+                x=fraud_counts.index,
+                y=fraud_counts.values,
+                color=fraud_counts.index,
+                text=fraud_counts.values,
+                labels={
+                    'x': 'Trạng thái',
+                    'y': 'Số lượng'
+                },
+                title='Phân bố hồ sơ tài chính'
+            )
+            st.plotly_chart(fig_dataset, use_container_width=True)
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+        with tab2:
+            st.subheader('📋 Bảng đánh giá mô hình')
+            st.dataframe(score_df, use_container_width=True)
 
-        for name, value in results.items():
-            report = value['report']
-            cm = value['confusion_matrix']
-            st.subheader(f'📋 {name}')
-            st.dataframe(
-                pd.DataFrame(report).transpose(),
-                use_container_width=True
+            fig_score = px.bar(
+                score_df,
+                x='Model',
+                y='Accuracy',
+                color='Model',
+                text='Accuracy',
+                title='So sánh độ chính xác mô hình AI'
+            )
+            st.plotly_chart(fig_score, use_container_width=True)
+
+            metric_df = score_df.melt(
+                id_vars='Model',
+                var_name='Metric',
+                value_name='Score'
             )
 
-            cm_df = pd.DataFrame(
-                cm,
-                index=encoder.classes_,
-                columns=encoder.classes_
+            fig = px.bar(
+                metric_df,
+                x='Model',
+                y='Score',
+                color='Metric',
+                barmode='group',
+                title='So sánh các chỉ số đánh giá'
             )
-            st.markdown('**Ma trận nhầm lẫn**')
-            st.dataframe(cm_df, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader('📌 Mức độ quan trọng của biến')
-        feature_df = get_feature_importance(best_model, X_columns)
-        if feature_df is not None:
-            fig_importance = px.bar(
-                feature_df,
-                x='Importance',
-                y='Feature',
-                orientation='h',
-                title='Feature Importance'
-            )
-            st.plotly_chart(fig_importance, use_container_width=True)
+            for name, value in results.items():
+                report = value['report']
+                cm = value['confusion_matrix']
+                st.subheader(f'📋 {name}')
+                st.dataframe(
+                    pd.DataFrame(report).transpose(),
+                    use_container_width=True
+                )
+
+                cm_df = pd.DataFrame(
+                    cm,
+                    index=encoder.classes_,
+                    columns=encoder.classes_
+                )
+                st.markdown('**Ma trận nhầm lẫn**')
+                st.dataframe(cm_df, use_container_width=True)
+
+                fig, ax = plt.subplots(figsize=(6, 4))
+                sns.heatmap(
+                    cm_df,
+                    annot=True,
+                    fmt='d',
+                    cmap='Blues',
+                    ax=ax
+                )
+                ax.set_xlabel('Predicted')
+                ax.set_ylabel('Actual')
+                st.pyplot(fig)
+
+        with tab3:
+            st.subheader('📌 Mức độ quan trọng của biến')
+            feature_df = get_feature_importance(best_model, X_columns)
+            if feature_df is not None:
+                fig_importance = px.bar(
+                    feature_df,
+                    x='Importance',
+                    y='Feature',
+                    orientation='h',
+                    title='Feature Importance'
+                )
+                st.plotly_chart(fig_importance, use_container_width=True)
 
 
 # ==================================================
 # PAGE 3 - PREDICTION
 # ==================================================
 else:
-    st.header('🔍 Dự Đoán Gian Lận')
+    st.title('🚨 Financial Risk Prediction')
+    st.markdown(
+        'Dự đoán mức độ rủi ro tài chính từ dữ liệu báo cáo tài chính.\n\n'
+        'Các mức dự đoán: 🟢 Normal, 🟡 Anomaly, 🔴 High Risk'
+    )
+    st.divider()
 
     trained_models = model_output['trained_models']
     best_model_name = model_output['best_model_name']
@@ -280,30 +375,83 @@ else:
             predict_df = pd.read_csv(uploaded_file)
         else:
             predict_df = pd.read_excel(uploaded_file)
+
         st.subheader('📄 Dữ liệu tải lên')
         st.dataframe(predict_df.head(), use_container_width=True)
+        st.divider()
 
-        try:
-            predict_X = align_upload_data(predict_df, X_columns)
-            predictions = selected_model.predict(predict_X)
-            labels = encoder.inverse_transform(predictions)
+        if st.button('🚀 Bắt đầu dự đoán'):
+            try:
+                predict_X = align_upload_data(predict_df, X_columns)
+                predictions = selected_model.predict(predict_X)
+                labels = encoder.inverse_transform(predictions)
 
-            predict_df['Kết quả AI'] = labels
-            st.subheader('📊 Kết quả dự đoán')
-            st.dataframe(predict_df, use_container_width=True)
+                result_df = predict_df.copy()
+                result_df['Prediction'] = labels
 
-            pie_data = predict_df['Kết quả AI'].value_counts()
-            fig_pie = px.pie(
-                names=pie_data.index,
-                values=pie_data.values,
-                title='Tỷ lệ phân loại hồ sơ'
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
+                normal_count = (labels == 'Normal').sum()
+                anomaly_count = (labels == 'Anomaly').sum()
+                high_count = (labels == 'High Risk').sum()
 
-            high_risk_count = (predict_df['Kết quả AI'] == 'High Risk').sum()
-            if high_risk_count > 0:
-                st.error(f'⚠️ Phát hiện {high_risk_count} hồ sơ có nguy cơ gian lận cao!')
-            else:
-                st.success('✅ Không phát hiện dấu hiệu bất thường!')
-        except Exception as exc:
-            st.error(f'Không thể dự đoán với dữ liệu hiện tại: {exc}')
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric('🟢 Normal', normal_count)
+                with col2:
+                    st.metric('🟡 Anomaly', anomaly_count)
+                with col3:
+                    st.metric('🔴 High Risk', high_count)
+
+                st.divider()
+
+                pie_df = pd.DataFrame({
+                    'Status': ['Normal', 'Anomaly', 'High Risk'],
+                    'Count': [normal_count, anomaly_count, high_count]
+                })
+                fig_pie = px.pie(
+                    pie_df,
+                    names='Status',
+                    values='Count',
+                    hole=0.55,
+                    title='📊 Phân bố kết quả dự đoán'
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+                risk_score = (high_count / len(labels)) * 100
+                fig_gauge = go.Figure(
+                    go.Indicator(
+                        mode='gauge+number',
+                        value=risk_score,
+                        title={'text': 'Financial Risk Score'},
+                        gauge={'axis': {'range': [0, 100]}}
+                    )
+                )
+                st.plotly_chart(fig_gauge, use_container_width=True)
+
+                st.divider()
+                st.subheader('📋 Kết quả dự đoán')
+
+                def color_status(value):
+                    if value == 'High Risk':
+                        return 'background-color:#ff4b4b;color:white'
+                    elif value == 'Anomaly':
+                        return 'background-color:#ffa500;color:black'
+                    return 'background-color:#00cc66;color:white'
+
+                st.dataframe(
+                    result_df.style.map(
+                        color_status,
+                        subset=['Prediction']
+                    ),
+                    use_container_width=True
+                )
+
+                csv = result_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    '📥 Download Results',
+                    csv,
+                    file_name='prediction_results.csv',
+                    mime='text/csv'
+                )
+
+            except Exception as exc:
+                st.error(f'Không thể dự đoán với dữ liệu hiện tại: {exc}')

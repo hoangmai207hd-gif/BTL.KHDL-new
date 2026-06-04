@@ -98,8 +98,8 @@ def train_models(X: pd.DataFrame, y: pd.Series, model_path: str = 'best_model.pk
     )
 
     models = {
-        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
-        'Random Forest': RandomForestClassifier(n_estimators=200, random_state=42),
+        'Logistic Regression': LogisticRegression(class_weight='balanced', max_iter=2000, random_state=42),
+        'Random Forest': RandomForestClassifier(n_estimators=300, class_weight='balanced', random_state=42),
         'XGBoost': XGBClassifier(eval_metric='logloss', random_state=42, use_label_encoder=False)
     }
 
