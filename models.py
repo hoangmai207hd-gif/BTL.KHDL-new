@@ -4,7 +4,14 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report
+)
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
@@ -97,26 +104,44 @@ def train_models(X: pd.DataFrame, y: pd.Series, model_path: str = 'best_model.pk
     }
 
     results = {}
+    results_list = []
     trained_models = {}
 
     for name, model in models.items():
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+
+        precision = precision_score(y_test, y_pred, average='weighted')
+        recall = recall_score(y_test, y_pred, average='weighted')
+        f1 = f1_score(y_test, y_pred, average='weighted')
 
         results[name] = {
-            'accuracy': accuracy_score(y_test, y_pred),
+            'accuracy': acc,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1,
             'report': classification_report(y_test, y_pred, output_dict=True),
             'confusion_matrix': confusion_matrix(y_test, y_pred).tolist()
         }
+
+        results_list.append({
+            'Model': name,
+            'Accuracy': round(acc, 4),
+            'Precision': round(precision, 4),
+            'Recall': round(recall, 4),
+            'F1-Score': round(f1, 4)
+        })
         trained_models[name] = model
 
-    best_model_name = max(results, key=lambda x: results[x]['accuracy'])
+    best_model_name = max(results, key=lambda x: results[x]['f1_score'])
     best_model = trained_models[best_model_name]
 
     save_model(best_model, model_path)
 
     return {
         'results': results,
+        'results_list': results_list,
         'trained_models': trained_models,
         'best_model_name': best_model_name,
         'best_model': best_model,

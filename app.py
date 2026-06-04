@@ -175,30 +175,70 @@ elif menu == 'Huấn luyện':
     if st.button('🚀 Bắt đầu huấn luyện'):
         with st.spinner('Đang huấn luyện AI...'):
             results = model_output['results']
+            results_list = model_output.get('results_list', [])
             trained_models = model_output['trained_models']
             best_model_name = model_output['best_model_name']
             best_model = model_output['best_model']
+            encoder = model_output['encoder']
 
-        st.success(f'✅ Mô hình tốt nhất: {best_model_name}')
+        st.success(f'✅ Mô hình tốt nhất theo F1-Score: {best_model_name}')
+        st.info(
+            'Hiệu suất các mô hình được đánh giá thông qua Accuracy, Precision, Recall và F1-Score. '
+            'Với dữ liệu mất cân bằng trong bài toán phát hiện gian lận tài chính, '
+            'F1-Score được chọn làm chỉ số chính vì nó phản ánh đồng thời khả năng phát hiện đúng gian lận và hạn chế cảnh báo sai.'
+        )
 
-        score_data = [
-            {'Mô hình': name, 'Accuracy': round(value['accuracy'], 4)}
-            for name, value in results.items()
-        ]
-        score_df = pd.DataFrame(score_data)
+        score_df = pd.DataFrame(results_list)
 
-        st.subheader('📋 Bảng điểm mô hình')
+        st.subheader('📋 Bảng đánh giá mô hình')
         st.dataframe(score_df, use_container_width=True)
 
         fig_score = px.bar(
             score_df,
-            x='Mô hình',
+            x='Model',
             y='Accuracy',
-            color='Mô hình',
+            color='Model',
             text='Accuracy',
-            title='So sánh hiệu suất mô hình AI'
+            title='So sánh độ chính xác mô hình AI'
         )
         st.plotly_chart(fig_score, use_container_width=True)
+
+        metric_df = score_df.melt(
+            id_vars='Model',
+            var_name='Metric',
+            value_name='Score'
+        )
+
+        fig = px.bar(
+            metric_df,
+            x='Model',
+            y='Score',
+            color='Metric',
+            barmode='group',
+            title='So sánh các chỉ số đánh giá'
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+        for name, value in results.items():
+            report = value['report']
+            cm = value['confusion_matrix']
+            st.subheader(f'📋 {name}')
+            st.dataframe(
+                pd.DataFrame(report).transpose(),
+                use_container_width=True
+            )
+
+            cm_df = pd.DataFrame(
+                cm,
+                index=encoder.classes_,
+                columns=encoder.classes_
+            )
+            st.markdown('**Ma trận nhầm lẫn**')
+            st.dataframe(cm_df, use_container_width=True)
 
         st.subheader('📌 Mức độ quan trọng của biến')
         feature_df = get_feature_importance(best_model, X_columns)
