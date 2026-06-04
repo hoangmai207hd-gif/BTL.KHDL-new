@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pkl
+*.xlsx
+*.xls
+README.md
+financial_anomaly_detection.py
